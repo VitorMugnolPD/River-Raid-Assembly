@@ -140,7 +140,7 @@
         Yplayer       dd 100 ;Coordenada y do jogador
         LOL           dd 25
         jogador plane <Xplayer,Yplayer,<NULL>>
-        bala          bullet <Xplayer,Yplayer,0,0>
+        ;bala          bullet <Xplayer,Yplayer,0,0>
 ; #########################################################################
 
 ; Variáveis ainda sem valor
@@ -298,8 +298,8 @@ WndProc proc hWin   :DWORD,
         sub Xplayer,30
       .elseif(wParam == 44h); Tecla D
         add Xplayer,30
-      .elseif(wParam == 20h); barra de espaço
-        assume edx:ptr bala bullet <Xplayer,Yplayer,0,0>
+      ;.elseif(wParam == 20h); barra de espaço
+        ;assume edx:ptr bala bullet <Xplayer,Yplayer,0,0>
         
     .endif          
 
@@ -404,5 +404,19 @@ ThreadProc PROC USES ecx Param:DWORD
   ret  
 
 ThreadProc ENDP 
+
+createBullet proc addrPlayer:DWORD
+  local bala: bullet
+  assume edx:ptr plane
+  assume ebx:ptr bullet
+  mov edx, addrPlayer
+  mov eax, [edx].x
+  mov bala.x, eax
+  mov eax, [edx].y
+  mov bala.y, eax
+  lea ebx, [bala]
+  mov [edx].bullets, ebx
+
+createBullet ENDP
 
 end start

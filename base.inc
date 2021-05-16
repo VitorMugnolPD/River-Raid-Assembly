@@ -19,10 +19,6 @@ plane struct
 
     x dd 0
     y dd 0
-    bullets bullet <>
+    bullets bullet 5 dup (<>)
 
 plane ends
-
-
-
-
