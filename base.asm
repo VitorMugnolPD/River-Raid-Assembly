@@ -120,26 +120,15 @@
     img3    equ     103
     img4    equ     104
     img5    equ     105
+    img6    equ     106
 
     CREF_TRANSPARENT  EQU 00FFFFFFh
 ; ############################################
 
 ; Variáveis ja com valor
 .data
-        szDisplayName db "River raid",0 ; Nome da janela
-        CommandLine   dd 0
-        hWnd          dd 0
-        hInstance     dd 0
-        buffer        db 128 dup(0)
-        X             dd 0
-        Y             dd 0
-        msg1          db "Mandou uma mensagem Ok",0
-        contador      dd 0
-        imgY          dd 100  
-        Xplayer       dd 190 ;Coordenada x do jogador
-        Yplayer       dd 100 ;Coordenada y do jogador
-        LOL           dd 25
-        jogador plane <Xplayer,Yplayer,<NULL>>
+        
+        ;jogador plane {}
         ;bala          bullet <Xplayer,Yplayer,0,0>
 ; #########################################################################
 
@@ -154,6 +143,7 @@
         hBmp        dd ?
         hBmpImg        dd ?
         hBmpHommer dd ?
+        hBmpBllt dd ?
         
 
 
@@ -183,6 +173,9 @@ start:
 
     invoke LoadBitmap, hInstance, img3
     mov    hBmpHommer, eax
+
+    invoke LoadBitmap, hInstance, img6
+    mov hBmpBllt, eax
 
 
     ; Chamamos a janela.
@@ -270,6 +263,20 @@ WinMain proc hInst     :DWORD,
 
 WinMain endp
 
+;createBullet proc addrPlayer:DWORD
+  ;local bal: bullet
+  ;assume edx:ptr plane
+  ;assume ebx:ptr bullet
+  ;mov edx, addrPlayer
+  ;mov ecx, [edx].x
+  ;mov [edx].bullets[0].x,ecx
+  ;mov bal.x, eax
+  ;mov ecx, [edx].y
+  ;mov [edx].bullets[0].y,ecx
+  ;mov bal.y, eax
+
+;createBullet ENDP
+
 ; #########################################################################
 ; Função da janela principal.
 WndProc proc hWin   :DWORD,
@@ -291,13 +298,29 @@ WndProc proc hWin   :DWORD,
 
     .elseif uMsg == WM_KEYDOWN
       .if (wParam == 57h) ; Tecla W
-        sub Yplayer,30
+        .if (Yplayer > 20)
+          sub Yplayer,30
+        .endif
       .elseif(wParam == 53h); Tecla S
-        add Yplayer,30
+        .if(Yplayer < 630)
+          add Yplayer,30
+        .endif
       .elseif(wParam == 41h);Tecla A
-        sub Xplayer,30
+        .if (Xplayer > 200)
+          sub Xplayer,30
+        .endif
       .elseif(wParam == 44h); Tecla D
-        add Xplayer,30
+        .if (Xplayer < 1150)
+          add Xplayer,30
+        .endif
+      .elseif(wParam == 20h); barra de espaço
+        mov ecx, 1
+        mov temBala, ecx
+        mov ebx, Yplayer
+        sub ebx, 2
+        mov bala.y, ebx 
+        mov ebx, Xplayer
+        mov bala.x, ebx
       ;.elseif(wParam == 20h); barra de espaço
         ;assume edx:ptr bala bullet <Xplayer,Yplayer,0,0>
         
@@ -331,9 +354,23 @@ WndProc proc hWin   :DWORD,
             invoke SelectObject, memDC, hBmpImg
             mov  hOld, eax  
 
-
             invoke TransparentBlt, hDC, Xplayer,Yplayer, 32,32, memDC, \
                             0,0,14,17, CREF_TRANSPARENT
+            
+            .if (temBala == 1)
+              invoke SelectObject, memDC, hBmpBllt
+              mov  hOld, eax  
+              invoke TransparentBlt, hDC, bala.x,bala.y, 32,32, memDC, \
+                            0,0,32,32, CREF_TRANSPARENT
+              mov ebx, bala.y
+              sub ebx, 5
+              mov bala.y, ebx
+
+              .if (bala.y < 10)
+                mov ebx, 0
+                mov temBala, ebx
+              .endif
+            .endif
 
             invoke SelectObject,hDC,hOld
             invoke DeleteDC,memDC  
@@ -404,19 +441,5 @@ ThreadProc PROC USES ecx Param:DWORD
   ret  
 
 ThreadProc ENDP 
-
-createBullet proc addrPlayer:DWORD
-  local bala: bullet
-  assume edx:ptr plane
-  assume ebx:ptr bullet
-  mov edx, addrPlayer
-  mov eax, [edx].x
-  mov bala.x, eax
-  mov eax, [edx].y
-  mov bala.y, eax
-  lea ebx, [bala]
-  mov [edx].bullets, ebx
-
-createBullet ENDP
 
 end start
