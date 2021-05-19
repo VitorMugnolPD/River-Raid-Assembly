@@ -20,7 +20,16 @@ include \masm32\include\msimg32.inc
     Yplayer       dd 100 ;Coordenada y do jogador
     LOL           dd 25
     temBala       dd 0
+    aparece1      dd 0
+    aparece2      dd 0
+    ondeAparece1  dd 0
+    ondeAparece2  dd 0
+    vivo1         dd 0
+    vivo2         dd 0
     bala          POINT <>
+    inimigo1      POINT <>
+    inimigo2      POINT <>
+    random_bytes dd 1 DUP (?)
 ;bullet struct
 
     ;x dd 0

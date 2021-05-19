@@ -31,8 +31,9 @@
     include \MASM32\INCLUDE\shell32.inc
     INCLUDE \Masm32\Include\msimg32.inc
     INCLUDE \Masm32\Include\oleaut32.inc
-    
-    
+    INCLUDE \MASM32\INCLUDE\cryptdll.inc
+
+    INCLUDELIB \Masm32\Lib\cryptdll.lib
     includelib \masm32\lib\kernel32.lib
     includelib \MASM32\LIB\gdi32.lib
     includelib \MASM32\LIB\Comctl32.lib
@@ -121,10 +122,14 @@
     img4    equ     104
     img5    equ     105
     img6    equ     106
+    img7    equ     107
+    img8    equ     108
 
     CREF_TRANSPARENT  EQU 00FFFFFFh
 ; ############################################
-
+NumberOfNumbers = 1        ; Number of random numbers to be generated and shown
+RangeOfNumbersAppear = 200
+RangeOfNumbersPlace = 1000   
 ; Variáveis ja com valor
 .data
         
@@ -144,7 +149,8 @@
         hBmpImg        dd ?
         hBmpHommer dd ?
         hBmpBllt dd ?
-        
+        hBmpEnemy1 dd ?
+        hBmpEnemy2 dd ?
 
 
 ;##############################################
@@ -176,6 +182,12 @@ start:
 
     invoke LoadBitmap, hInstance, img6
     mov hBmpBllt, eax
+
+    invoke LoadBitmap, hInstance, img7
+    mov hBmpEnemy1, eax
+
+    invoke LoadBitmap, hInstance, img8
+    mov hBmpEnemy2, eax
 
 
     ; Chamamos a janela.
@@ -262,6 +274,18 @@ WinMain proc hInst     :DWORD,
       return msg.wParam
 
 WinMain endp
+
+; PseudoRandom PROC                       ; Deliver EAX: Range (0..EAX-1)
+;       push  edx                         ; Preserve EDX
+;       imul  edx,RandSeed,08088405H      ; EDX = RandSeed * 0x08088405 (decimal 134775813)
+;       inc   edx
+;       mov   RandSeed, edx               ; New RandSeed
+;       mul   edx                         ; EDX:EAX = EAX * EDX
+;       mov   eax, edx                    ; Return the EDX from the multiplication
+;       pop   edx                         ; Restore EDX
+;       ret
+; ret
+; PseudoRandom ENDP                       ; Return EAX: Random number in range
 
 ;createBullet proc addrPlayer:DWORD
   ;local bal: bullet
@@ -351,9 +375,76 @@ WndProc proc hWin   :DWORD,
             invoke CreateCompatibleDC, hDC
             mov   memDC, eax
 
+            invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+              lea esi, random_bytes
+              lodsd 
+              mov ecx, RangeOfNumbersAppear             ; Range (0..RangeOfNumbers-1)
+              xor edx, edx                        ; Needed for DIV
+              div ecx
+
+            mov aparece1, edx
+            .if (aparece1 > 198)
+              mov ebx, 1
+              mov vivo1, ebx
+              invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+                lea esi, random_bytes
+                lodsd 
+                mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
+                xor edx, edx                        ; Needed for DIV
+                div ecx
+              add edx, 250
+              mov ondeAparece1, edx
+              mov ebx, 0
+              mov inimigo1.y, ebx
+            .endif
+
+            .if (ondeAparece1 > 200)
+              .if (vivo1 > 0)
+                invoke SelectObject, memDC, hBmpEnemy1
+                mov  hOld, eax  
+                invoke TransparentBlt, hDC, ondeAparece1,inimigo1.y, 32,32, memDC, \
+                              0,0,32,32, CREF_TRANSPARENT
+                mov ebx, inimigo1.y
+                add ebx, 5
+                mov inimigo1.y, ebx
+              .endif
+            .endif
+
+            invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+              lea esi, random_bytes
+              lodsd 
+              mov ecx, RangeOfNumbersAppear             ; Range (0..RangeOfNumbers-1)
+              xor edx, edx                        ; Needed for DIV
+              div ecx
+
+            mov aparece2, edx
+            .if (aparece2 > 198)
+              mov ebx, 1
+              mov vivo2, ebx
+              invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+                lea esi, random_bytes
+                lodsd 
+                mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
+                xor edx, edx                        ; Needed for DIV
+                div ecx
+              add edx, 500
+              mov ondeAparece2, edx
+              mov ebx, 0
+              mov inimigo2.y, ebx
+            .endif
+
+            .if (ondeAparece2 > 200)
+              invoke SelectObject, memDC, hBmpEnemy2
+              mov  hOld, eax  
+              invoke TransparentBlt, hDC, ondeAparece2,inimigo2.y, 32,32, memDC, \
+                            0,0,32,32, CREF_TRANSPARENT
+              mov ebx, inimigo2.y
+              add ebx, 5
+              mov inimigo2.y, ebx
+            .endif
+
             invoke SelectObject, memDC, hBmpImg
             mov  hOld, eax  
-
             invoke TransparentBlt, hDC, Xplayer,Yplayer, 32,32, memDC, \
                             0,0,14,17, CREF_TRANSPARENT
             
@@ -369,6 +460,27 @@ WndProc proc hWin   :DWORD,
               .if (bala.y < 10)
                 mov ebx, 0
                 mov temBala, ebx
+              .endif
+            .endif
+
+            mov ebx, ondeAparece1
+            sub ebx, 10
+            .if (bala.x > ebx)
+              mov ebx, ondeAparece1
+              add ebx, 10
+              .if (bala.x < ebx)
+                mov ebx, 0
+                mov vivo1, ebx
+              .endif
+            .endif
+            mov ebx, ondeAparece2
+            sub ebx, 10
+            .if (bala.x > ebx)
+              mov ebx, ondeAparece2
+              add ebx, 10
+              .if (bala.x < ebx)
+                mov ebx, 0
+                mov vivo2, ebx
               .endif
             .endif
 
