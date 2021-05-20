@@ -171,6 +171,7 @@ RangeOfNumbersGasAppear = 100
         
         Explosion     db "explosion.wav", 0
         Fuel          db "fuel.wav", 0
+        MusicBackground db "soundtrack.mp3", 0
 
         ; - MCI_OPEN_PARMS Structure ( API=mciSendCommand ) -
         open_dwCallback     dd ?
@@ -369,6 +370,10 @@ WndProc proc hWin   :DWORD,
     LOCAL hOld   :DWORD
     LOCAL memDC  :DWORD
 
+    LOCAL rect   :RECT
+    LOCAL Font   :DWORD
+    LOCAL Font2  :DWORD
+
     ; cuidado ao declarar variaveis locais pois ao terminar o procedimento
     ; seu valor é limpado colocado lixo no lugar.
 
@@ -384,6 +389,14 @@ WndProc proc hWin   :DWORD,
       .elseif(wParam == 53h); Tecla S
         .if(Yplayer < 630)
           add Yplayer,10
+          .if (musica < 1)
+            mov   open_lpstrDeviceType, 0h         ;fill MCI_OPEN_PARMS structure
+            mov   open_lpstrElementName,OFFSET MusicBackground
+            invoke mciSendCommandA,0,MCI_OPEN, MCI_OPEN_ELEMENT,offset open_dwCallback 
+            invoke mciSendCommandA,open_wDeviceID,MCI_PLAY,MCI_FROM or MCI_NOTIFY,offset play_dwCallback
+            mov ebx, 1
+            mov musica, ebx
+          .endif
         .endif
       .elseif(wParam == 41h);Tecla A
         .if (Xplayer > 200)
@@ -458,7 +471,7 @@ WndProc proc hWin   :DWORD,
 
             invoke SelectObject, memDC, hBmpGas
             mov  hOld, eax  
-            invoke TransparentBlt, hDC, ondeApareceGas,gas.y, 32,32, memDC, \
+            invoke TransparentBlt, hDC, ondeApareceGas,gas.y, 48,48, memDC, \
                           0,0,32,32, CREF_TRANSPARENT
             
             mov ebx, gas.y
@@ -499,7 +512,7 @@ WndProc proc hWin   :DWORD,
               .if (vivo1 > 0)
                 invoke SelectObject, memDC, hBmpEnemy1
                 mov  hOld, eax  
-                invoke TransparentBlt, hDC, ondeAparece1,inimigo1.y, 32,32, memDC, \
+                invoke TransparentBlt, hDC, ondeAparece1,inimigo1.y, 48,48, memDC, \
                               0,0,32,32, CREF_TRANSPARENT
                 mov ebx, inimigo1.y
                 add ebx, 5
@@ -536,7 +549,7 @@ WndProc proc hWin   :DWORD,
               .if (vivo2 > 0)
                 invoke SelectObject, memDC, hBmpEnemy2
                 mov  hOld, eax  
-                invoke TransparentBlt, hDC, ondeAparece2,inimigo2.y, 32,32, memDC, \
+                invoke TransparentBlt, hDC, ondeAparece2,inimigo2.y, 48,48, memDC, \
                               0,0,32,32, CREF_TRANSPARENT
                 mov ebx, inimigo2.y
                 add ebx, 5
@@ -552,7 +565,7 @@ WndProc proc hWin   :DWORD,
             .if (temBala == 1)
               invoke SelectObject, memDC, hBmpBllt
               mov  hOld, eax  
-              invoke TransparentBlt, hDC, bala.x,bala.y, 32,32, memDC, \
+              invoke TransparentBlt, hDC, bala.x,bala.y, 48,48, memDC, \
                             0,0,32,32, CREF_TRANSPARENT
               mov ebx, bala.y
               sub ebx, 5
@@ -580,6 +593,9 @@ WndProc proc hWin   :DWORD,
                     mov   open_lpstrElementName,OFFSET Fuel
                     invoke mciSendCommandA,0,MCI_OPEN, MCI_OPEN_ELEMENT,offset open_dwCallback 
                     invoke mciSendCommandA,open_wDeviceID,MCI_PLAY,MCI_FROM or MCI_NOTIFY,offset play_dwCallback
+                    mov ebx, gasolina
+                    add ebx, 250
+                    mov gasolina, ebx
                   .endif
                 .endif
               .endif
@@ -645,6 +661,75 @@ WndProc proc hWin   :DWORD,
                 .endif
               .endif
             .endif
+
+            mov ebx, ondeAparece1
+            sub ebx, 30
+            .if (Xplayer > ebx)
+              mov ebx, ondeAparece1
+              add ebx, 30
+              .if (Xplayer < ebx)
+                mov ebx, inimigo1.y
+                sub ebx, 30
+                .if (Yplayer > ebx)
+                  mov ebx, inimigo1.y
+                  add ebx, 30
+                  .if (Yplayer < ebx)
+                    invoke wsprintf,addr buffer,chr$("PERDEU O JOGO PONTACAO =  %d"), pontuacao
+                    invoke MessageBox,hWin,ADDR buffer,ADDR szDisplayName,MB_OK
+                    invoke ExitProcess, NULL 
+                  .endif
+                .endif
+              .endif
+            .endif
+            mov ebx, ondeAparece2
+            sub ebx, 30
+            .if (Xplayer > ebx)
+              mov ebx, ondeAparece2
+              add ebx, 30
+              .if (Xplayer < ebx)
+                mov ebx, inimigo2.y
+                sub ebx, 30
+                .if (Yplayer > ebx)
+                  mov ebx, inimigo2.y
+                  add ebx, 30
+                  .if (Yplayer < ebx)
+                    invoke wsprintf,addr buffer,chr$("PERDEU O JOGO PONTACAO =  %d"), pontuacao
+                    invoke MessageBox,hWin,ADDR buffer,ADDR szDisplayName,MB_OK
+                    invoke ExitProcess, NULL 
+                  .endif
+                .endif
+              .endif
+            .endif
+
+            mov ebx, gasolina
+            sub ebx, 1
+            mov gasolina, ebx
+            .if(gasolina < 20)
+              invoke wsprintf,addr buffer,chr$("PERDEU O JOGO ACABOU A GASOLINA PONTACAO =  %d"), pontuacao
+              invoke MessageBox,hWin,ADDR buffer,ADDR szDisplayName,MB_OK
+              invoke ExitProcess, NULL 
+            .endif
+
+        ;     invoke wsprintf,addr buffer,chr$("Pontuacao = %d"), pontuacao
+        ;  ;   invoke MessageBox,hWin,ADDR buffer,ADDR szDisplayName,MB_OK
+        ;     ;invoke InvalidateRect, hWnd, NULL, FALSE
+        ;     mov   rect.left, 10
+        ;     mov   rect.top , 200
+        ;     mov   rect.right, 350
+        ;     mov   rect.bottom, 230
+        ;     ;invoke InvalidateRect, hWnd, addr rect, TRUE
+
+            ; mov   rect.left, 20
+            ; mov   rect.top , 20
+            ; mov   rect.right, 220
+            ; mov   rect.bottom, 40
+            ; ;invoke wsprintf,addr buffer,chr$("Pontuacao = %d"), pontuacao
+
+            ; invoke SetBkMode, hDC, TRANSPARENT
+            ; invoke SetTextColor,hDC,00EE12FAh   ;
+            ; szText texto2,"Pontuacao = %d"
+            ; invoke DrawText, hDC, ADDR texto2, -1, ADDR rect, \
+            ;      DT_SINGLELINE or DT_CENTER ; or DT_VCENTER
 
             invoke SelectObject,hDC,hOld
             invoke DeleteDC,memDC  

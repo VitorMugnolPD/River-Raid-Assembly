@@ -32,7 +32,9 @@ include \masm32\include\msimg32.inc
     gas           POINT <>
     gasNaTela     dd 0
     pontuacao     dd 0
+    gasolina      dd 2000
     inimigo1      POINT <>
+    musica        dd 0
     inimigo2      POINT <>
     random_bytes dd 1 DUP (?)
 ;bullet struct
