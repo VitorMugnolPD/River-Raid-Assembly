@@ -1,5 +1,3 @@
-
-
       .386                   ; minimum processor needed for 32 bit
       .model flat, stdcall   ; FLAT memory model & STDCALL calling
       option casemap :none   ; set code to case sensitive
@@ -45,6 +43,24 @@
     INCLUDELIB \Masm32\Lib\msvcrt.lib
     INCLUDELIB \Masm32\Lib\masm32.lib
 
+    include \masm32\include\windows.inc
+
+    include \masm32\include\user32.inc
+    include \masm32\include\kernel32.inc
+
+    include \MASM32\INCLUDE\gdi32.inc
+	  include \Masm32\include\winmm.inc 
+
+
+    includelib \masm32\lib\user32.lib
+    includelib \masm32\lib\kernel32.lib
+    includelib \MASM32\LIB\gdi32.lib
+
+; Bibliotecas para MCI tocar o mp3
+;
+ 
+	  includelib \Masm32\lib\winmm.lib
+
     include base.inc
 
 ; #########################################################################
@@ -58,6 +74,19 @@
       ; 1. szText
       ; A macro to insert TEXT into the code section for convenient and 
       ; more intuitive coding of functions that use byte data as text.
+
+      ; 3. return
+      ; Every procedure MUST have a "ret" to return the instruction
+      ; pointer EIP back to the next instruction after the call that
+      ; branched to it. This macro puts a return value in eax and
+      ; makes the "ret" instruction on one line. It is mainly used
+      ; for clear coding in complex conditionals in large branching
+      ; code such as the WndProc procedure.
+
+      return MACRO arg
+        mov eax, arg
+        ret
+      ENDM
 
       szText MACRO Name, Text:VARARG
         LOCAL lbl
@@ -100,6 +129,8 @@
 
         WinMain PROTO :DWORD,:DWORD,:DWORD,:DWORD
         WndProc PROTO :DWORD,:DWORD,:DWORD,:DWORD
+        PlaySound PROTO STDCALL :DWORD, :DWORD, :DWORD
+        TopXY PROTO   :DWORD,:DWORD
 
 ; #########################################################################
 
@@ -124,17 +155,37 @@
     img6    equ     106
     img7    equ     107
     img8    equ     108
+    img9    equ     109
 
     CREF_TRANSPARENT  EQU 00FFFFFFh
 ; ############################################
 NumberOfNumbers = 1        ; Number of random numbers to be generated and shown
 RangeOfNumbersAppear = 200
 RangeOfNumbersPlace = 1000   
+RangeOfNumbersGasAppear = 100
 ; Variáveis ja com valor
 .data
         
         ;jogador plane {}
         ;bala          bullet <Xplayer,Yplayer,0,0>
+        
+        Explosion     db "explosion.wav", 0
+        Fuel          db "fuel.wav", 0
+
+        ; - MCI_OPEN_PARMS Structure ( API=mciSendCommand ) -
+        open_dwCallback     dd ?
+        open_wDeviceID     dd ?
+        open_lpstrDeviceType  dd ?
+        open_lpstrElementName  dd ?
+        open_lpstrAlias     dd ?
+
+            ; - MCI_GENERIC_PARMS Structure ( API=mciSendCommand ) -
+            generic_dwCallback   dd ?
+
+            ; - MCI_PLAY_PARMS Structure ( API=mciSendCommand ) -
+        play_dwCallback     dd ?
+        play_dwFrom       dd ?
+        play_dwTo        dd ?
 ; #########################################################################
 
 ; Variáveis ainda sem valor
@@ -151,6 +202,8 @@ RangeOfNumbersPlace = 1000
         hBmpBllt dd ?
         hBmpEnemy1 dd ?
         hBmpEnemy2 dd ?
+        hBmpGas dd ?
+        ; Musics
 
 
 ;##############################################
@@ -188,6 +241,9 @@ start:
 
     invoke LoadBitmap, hInstance, img8
     mov hBmpEnemy2, eax
+
+    invoke LoadBitmap, hInstance, img9
+    mov hBmpGas, eax
 
 
     ; Chamamos a janela.
@@ -323,19 +379,19 @@ WndProc proc hWin   :DWORD,
     .elseif uMsg == WM_KEYDOWN
       .if (wParam == 57h) ; Tecla W
         .if (Yplayer > 20)
-          sub Yplayer,30
+          sub Yplayer,10
         .endif
       .elseif(wParam == 53h); Tecla S
         .if(Yplayer < 630)
-          add Yplayer,30
+          add Yplayer,10
         .endif
       .elseif(wParam == 41h);Tecla A
         .if (Xplayer > 200)
-          sub Xplayer,30
+          sub Xplayer,10
         .endif
       .elseif(wParam == 44h); Tecla D
         .if (Xplayer < 1150)
-          add Xplayer,30
+          add Xplayer,10
         .endif
       .elseif(wParam == 20h); barra de espaço
         mov ecx, 1
@@ -378,24 +434,65 @@ WndProc proc hWin   :DWORD,
             invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
               lea esi, random_bytes
               lodsd 
+              mov ecx, RangeOfNumbersGasAppear             ; Range (0..RangeOfNumbers-1)
+              xor edx, edx                        ; Needed for DIV
+              div ecx
+
+            mov apareceGas, edx
+            .if (apareceGas > 5)
+              .if (gasNaTela < 1)
+                mov ebx, 1
+                mov gasNaTela, ebx
+                invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+                  lea esi, random_bytes
+                  lodsd 
+                  mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
+                  xor edx, edx                        ; Needed for DIV
+                  div ecx
+                add edx, 250
+                mov ondeApareceGas, edx
+                mov ebx, 0
+                mov gas.y, ebx
+              .endif
+            .endif
+
+            invoke SelectObject, memDC, hBmpGas
+            mov  hOld, eax  
+            invoke TransparentBlt, hDC, ondeApareceGas,gas.y, 32,32, memDC, \
+                          0,0,32,32, CREF_TRANSPARENT
+            
+            mov ebx, gas.y
+            add ebx, 5
+            mov gas.y, ebx
+
+            .if (gas.y > 700)
+              mov ebx, 0
+              mov gasNaTela, ebx
+            .endif
+
+            invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+              lea esi, random_bytes
+              lodsd 
               mov ecx, RangeOfNumbersAppear             ; Range (0..RangeOfNumbers-1)
               xor edx, edx                        ; Needed for DIV
               div ecx
 
             mov aparece1, edx
             .if (aparece1 > 198)
-              mov ebx, 1
-              mov vivo1, ebx
-              invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
-                lea esi, random_bytes
-                lodsd 
-                mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
-                xor edx, edx                        ; Needed for DIV
-                div ecx
-              add edx, 250
-              mov ondeAparece1, edx
-              mov ebx, 0
-              mov inimigo1.y, ebx
+              .if (vivo1 < 1)
+                mov ebx, 1
+                mov vivo1, ebx
+                invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+                  lea esi, random_bytes
+                  lodsd 
+                  mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
+                  xor edx, edx                        ; Needed for DIV
+                  div ecx
+                add edx, 250
+                mov ondeAparece1, edx
+                mov ebx, 0
+                mov inimigo1.y, ebx
+              .endif
             .endif
 
             .if (ondeAparece1 > 200)
@@ -419,28 +516,32 @@ WndProc proc hWin   :DWORD,
 
             mov aparece2, edx
             .if (aparece2 > 198)
-              mov ebx, 1
-              mov vivo2, ebx
-              invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
-                lea esi, random_bytes
-                lodsd 
-                mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
-                xor edx, edx                        ; Needed for DIV
-                div ecx
-              add edx, 500
-              mov ondeAparece2, edx
-              mov ebx, 0
-              mov inimigo2.y, ebx
+              .if (vivo2 < 1)
+                mov ebx, 1
+                mov vivo2, ebx
+                invoke CDGenerateRandomBits, Addr random_bytes, (NumberOfNumbers)
+                  lea esi, random_bytes
+                  lodsd 
+                  mov ecx, RangeOfNumbersPlace             ; Range (0..RangeOfNumbers-1)
+                  xor edx, edx                        ; Needed for DIV
+                  div ecx
+                add edx, 500
+                mov ondeAparece2, edx
+                mov ebx, 0
+                mov inimigo2.y, ebx
+              .endif
             .endif
 
             .if (ondeAparece2 > 200)
-              invoke SelectObject, memDC, hBmpEnemy2
-              mov  hOld, eax  
-              invoke TransparentBlt, hDC, ondeAparece2,inimigo2.y, 32,32, memDC, \
-                            0,0,32,32, CREF_TRANSPARENT
-              mov ebx, inimigo2.y
-              add ebx, 5
-              mov inimigo2.y, ebx
+              .if (vivo2 > 0)
+                invoke SelectObject, memDC, hBmpEnemy2
+                mov  hOld, eax  
+                invoke TransparentBlt, hDC, ondeAparece2,inimigo2.y, 32,32, memDC, \
+                              0,0,32,32, CREF_TRANSPARENT
+                mov ebx, inimigo2.y
+                add ebx, 5
+                mov inimigo2.y, ebx
+              .endif
             .endif
 
             invoke SelectObject, memDC, hBmpImg
@@ -463,14 +564,60 @@ WndProc proc hWin   :DWORD,
               .endif
             .endif
 
+            mov ebx, ondeApareceGas
+            sub ebx, 10
+            .if (Xplayer > ebx)
+              mov ebx, ondeApareceGas
+              add ebx, 10
+              .if (Xplayer < ebx)
+                mov ebx, gas.y
+                sub ebx, 10
+                .if (Yplayer > ebx)
+                  mov ebx, gas.y
+                  add ebx, 10
+                  .if (Yplayer < ebx)
+                    mov   open_lpstrDeviceType, 0h         ;fill MCI_OPEN_PARMS structure
+                    mov   open_lpstrElementName,OFFSET Fuel
+                    invoke mciSendCommandA,0,MCI_OPEN, MCI_OPEN_ELEMENT,offset open_dwCallback 
+                    invoke mciSendCommandA,open_wDeviceID,MCI_PLAY,MCI_FROM or MCI_NOTIFY,offset play_dwCallback
+                  .endif
+                .endif
+              .endif
+            .endif
+
+            .if (inimigo1.y > 700)
+              mov ebx, 0
+              mov vivo1, ebx
+            .endif
+
+            .if (inimigo2.y > 700)
+              mov ebx, 0
+              mov vivo2, ebx
+            .endif
+
             mov ebx, ondeAparece1
             sub ebx, 10
             .if (bala.x > ebx)
               mov ebx, ondeAparece1
               add ebx, 10
               .if (bala.x < ebx)
-                mov ebx, 0
-                mov vivo1, ebx
+                mov ebx, inimigo1.y
+                sub ebx, 10
+                .if (bala.y > ebx)
+                  mov ebx, inimigo1.y
+                  add ebx, 10
+                  .if (bala.y < ebx)
+                    mov ebx, 0
+                    mov vivo1, ebx
+                    mov ebx, pontuacao
+                    add ebx, 10
+                    mov pontuacao, ebx
+                    mov   open_lpstrDeviceType, 0h         ;fill MCI_OPEN_PARMS structure
+                    mov   open_lpstrElementName,OFFSET Explosion
+                    invoke mciSendCommandA,0,MCI_OPEN, MCI_OPEN_ELEMENT,offset open_dwCallback 
+                    invoke mciSendCommandA,open_wDeviceID,MCI_PLAY,MCI_FROM or MCI_NOTIFY,offset play_dwCallback
+                  .endif
+                .endif
               .endif
             .endif
             mov ebx, ondeAparece2
@@ -479,8 +626,23 @@ WndProc proc hWin   :DWORD,
               mov ebx, ondeAparece2
               add ebx, 10
               .if (bala.x < ebx)
-                mov ebx, 0
-                mov vivo2, ebx
+                mov ebx, inimigo2.y
+                sub ebx, 10
+                .if (bala.y > ebx)
+                  mov ebx, inimigo2.y
+                  add ebx, 10
+                  .if (bala.y < ebx)
+                    mov ebx, 0
+                    mov vivo2, ebx
+                    mov ebx, pontuacao
+                    add ebx, 10
+                    mov pontuacao, ebx
+                    mov   open_lpstrDeviceType, 0h         ;fill MCI_OPEN_PARMS structure
+                    mov   open_lpstrElementName,OFFSET Explosion
+                    invoke mciSendCommandA,0,MCI_OPEN, MCI_OPEN_ELEMENT,offset open_dwCallback 
+                    invoke mciSendCommandA,open_wDeviceID,MCI_PLAY,MCI_FROM or MCI_NOTIFY,offset play_dwCallback
+                  .endif
+                .endif
               .endif
             .endif
 

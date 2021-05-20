@@ -24,9 +24,14 @@ include \masm32\include\msimg32.inc
     aparece2      dd 0
     ondeAparece1  dd 0
     ondeAparece2  dd 0
+    apareceGas    dd 0
+    ondeApareceGas dd 0
     vivo1         dd 0
     vivo2         dd 0
     bala          POINT <>
+    gas           POINT <>
+    gasNaTela     dd 0
+    pontuacao     dd 0
     inimigo1      POINT <>
     inimigo2      POINT <>
     random_bytes dd 1 DUP (?)
